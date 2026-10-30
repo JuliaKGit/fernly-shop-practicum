@@ -1,0 +1,24 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.level1 {
+  background: #e3f1df;
+  color: #24502c;
+}
+
+.level2 {
+  background: #fdf1d8;
+  color: #6b4a07;
+}
+
+.level3 {
+  background: #fbe3dc;
+  color: #7a2a14;
+}

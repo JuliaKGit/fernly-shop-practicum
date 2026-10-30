@@ -1,0 +1,56 @@
+.summary {
+  padding: 1.2rem 1.3rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.title {
+  margin: 0 0 0.8rem;
+  font-size: 1.15rem;
+}
+
+.rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.row dt {
+  color: var(--muted);
+}
+
+.row dd {
+  margin: 0;
+}
+
+.total {
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--line);
+}
+
+.total dt {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.free {
+  color: var(--leaf-700);
+}
+
+.hint {
+  margin: 0.9rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: var(--leaf-50);
+  color: var(--leaf-800);
+  font-size: 0.9rem;
+}

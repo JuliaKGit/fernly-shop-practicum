@@ -1,0 +1,50 @@
+.line {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto 6rem auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.image {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  background: var(--leaf-50);
+  border-radius: 12px;
+  padding: 0.3rem;
+}
+
+.info {
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.remove {
+  border: 0;
+  background: transparent;
+  color: #8a2f22;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .line {
+    grid-template-columns: 4rem 1fr;
+  }
+}

@@ -1,0 +1,19 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.safe {
+  background: #e6f0fb;
+  color: #1d4a7a;
+}
+
+.unsafe {
+  background: #f2efe8;
+  color: #5b5446;
+}

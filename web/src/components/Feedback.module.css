@@ -1,0 +1,79 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 3rem 1rem;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+.emptyIcon {
+  font-size: 2.2rem;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.emptyMessage {
+  margin: 0;
+  color: var(--muted);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #fdecea;
+  border: 1px solid #f3b8b0;
+  color: #7a1f14;
+}
+
+.retry {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  background: #7a1f14;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toast {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  font-weight: 600;
+}
+
+.toastSuccess {
+  background: var(--leaf-800);
+  color: #fff;
+}
+
+.toastError {
+  background: #7a1f14;
+  color: #fff;
+}
+
+.close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}

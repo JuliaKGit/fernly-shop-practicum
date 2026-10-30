@@ -1,0 +1,17 @@
+.price {
+  font-weight: 700;
+  color: #8dbb8a;
+  font-variant-numeric: tabular-nums;
+}
+
+.sm {
+  font-size: 0.9rem;
+}
+
+.md {
+  font-size: 1.05rem;
+}
+
+.lg {
+  font-size: 1.6rem;
+}
