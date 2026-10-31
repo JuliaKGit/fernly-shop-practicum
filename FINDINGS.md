@@ -17,7 +17,14 @@ One entry per issue, ordered by severity: money and privacy first, then broken f
 
 ## Findings
 
-None yet — nothing has been proven by a test.
+### F-01. Quantity stepper's + button stays enabled at the stock limit
+
+- **Where:** `QuantityStepper` component (`web/src/components/QuantityStepper.tsx`), used on the plant page and in cart lines
+- **Category:** Components
+- **Impact:** A customer can raise the quantity one above the stock left, asking for a plant the shop doesn't have.
+- **Evidence:** `web/cypress/component/QuantityStepper.cy.tsx`, test "disables + at the stock limit", fails under `npm run cy:component`. It mounts the stepper with `value={3}` and `max={3}`, and the "Increase quantity" button is not disabled. Screenshot: `web/cypress/screenshots/QuantityStepper.cy.tsx/QuantityStepper -- disables + at the stock limit (failed).png`. The other three stepper tests pass (+ and − call `onChange` with the new value, − is disabled at the minimum).
+- **Contradicts:** `docs/PRODUCT.md`: "**Quantity** starts at 1 and can never go above the stock left: at the stock limit, the **+** button is disabled."
+- **Suggested fix:** Disable + when `value >= max` instead of `value > max`.
 
 ## Suspicions — not yet tested
 
@@ -25,8 +32,7 @@ Things that look different from `docs/PRODUCT.md` (or the API contract), from re
 
 - **Plant page after a "Likes the same light" link** (Caching) — seen: the address bar said `/plants/pl-fiddle` while the page still showed Bird of Paradise at $50; code: `usePlant` caches every plant under the same key `['plant']`, so Add to cart may add the wrong plant. *May contradict:* "The plant page always shows the plant in the address bar, including after following a "Likes the same light" link."
 - **`formatPrice` / `PriceTag` / `SizePicker`** (Components) — seen: `$22`, `$27.5`, `$12.5`, `$50`, `+$6`; code: `Math.round(amount * 100) / 100` with no fixed two decimals. *May contradict:* "Every price is shown in dollars with two decimals, everywhere: `$12.50`, never `$12.5`."
-- **`QuantityStepper` + button** (Components) — code: + is disabled only when `value > max`, so the quantity can go one above the stock. *May contradict:* "Quantity … can never go above the stock left: at the stock limit, the + button is disabled."
-- **Cart line stepper** (Components / Business rules in the API) — code: the same stepper lets a cart line ask for stock + 1, so only the API's `stock_limit` stands in the way. *May contradict:* "A line can never hold more than the plant's stock."
+- **Cart line stepper** (Components / Business rules in the API) — code: the same stepper as F-01 lets a cart line ask for stock + 1, so only the API's `stock_limit` stands in the way. *May contradict:* "A line can never hold more than the plant's stock."
 - **Order page after signing out and in as another customer** (Caching / Authorization) — code: sign-out drops the cached cart and order list but not single orders (`['order', id]`), so the second customer may briefly see the first customer's order from the cache. *May contradict:* "An order is private: only the customer who placed it can see it. Anyone else gets "Order not found"" and "Signing out forgets the session on this device."
 - **Browse page when the catalog fails to load** (Pages) — code: an API error renders "No plants match your filters" with no Try again button. *May contradict:* "If the catalog can't be loaded, the page says so and offers **Try again**. It never pretends there are no plants."
 - **`CareLevelBadge` for level 3** (Components) — seen: three-dot plants (Fiddle Leaf Fig, Calathea Orbifolia, String of Pearls) say "Moderate care"; code: `LABELS[Math.min(level, 2) - 1]`. *May contradict:* "Care level has three steps: 1 **Easy**, 2 **Moderate**, 3 **Expert**." and the contract's `careLevel` "1 Easy, 2 Moderate, 3 Expert."
