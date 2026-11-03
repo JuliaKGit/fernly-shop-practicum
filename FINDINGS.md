@@ -17,7 +17,14 @@ One entry per proven issue, ordered by severity: money and privacy first, then b
 
 ## Findings
 
-None yet. Nothing below has been proven by a test.
+### F-01: The + button stays enabled at the stock limit
+
+- **Where:** `QuantityStepper` (`web/src/components/QuantityStepper.tsx`), used on the plant page and in the cart
+- **Category:** Components
+- **Impact:** A customer can raise the quantity one above the stock left before + is disabled.
+- **Evidence:** `web/cypress/component/QuantityStepper.cy.tsx`, "disables + at the stock limit": mounted with value 3 and max 3, + is still enabled (`npm run cy:component`, 3 passing, 1 failing; screenshot in `web/cypress/screenshots/`)
+- **Contradicts:** PRODUCT.md: "Quantity starts at 1 and can never go above the stock left: at the stock limit, the + button is disabled."
+- **Suggested fix (optional):** Disable + at `value >= max` instead of `value > max`.
 
 ## Suspicions — not yet tested
 
@@ -37,7 +44,6 @@ These come from reading the code and from the first walk-through of the shop. "S
 ### Broken flows
 
 - **The plant page shows the previous plant after a "Likes the same light" link** (`web/src/api/queries.ts` `usePlant` caches under `['plant']` with no id; seen: from Snake Plant, clicking ZZ Plant gives the URL `/plants/pl-zz` but still shows Snake Plant, $22, 20 in stock; Add to cart there would add Snake Plant) — may contradict PRODUCT.md: "The plant page always shows the plant in the address bar, including after following a 'Likes the same light' link."
-- **The + button stays enabled at the stock limit** (`QuantityStepper` disables + at `value > max`, not `value >= max`; seen: String of Pearls has 1 in stock, and + went to 2 before disabling; the same stepper is used in the cart) — may contradict PRODUCT.md: "Quantity … can never go above the stock left: at the stock limit, the + button is disabled."
 - **A catalog load failure looks like "no matching plants", with no Try again** (`BrowsePage` renders the same `EmptyState` for `plants.isError` and for an empty list) — may contradict PRODUCT.md: "If the catalog can't be loaded, the page says so and offers Try again. It never pretends there are no plants."
 
 ### Components and the contract
