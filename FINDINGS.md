@@ -53,6 +53,24 @@ One entry per issue, ordered by severity: money and privacy first, then broken f
 - **Contradicts:** `docs/APP-MAP.md` `/cart`: "**Change rejected:** error toast with the API's `detail`."
 - **Suggested fix:** Ensure failed `updateLine` / `removeLine` mutations surface `error.message` in the cart `Toast` (same pattern as the plant page add-to-cart error).
 
+### F-05. Price: high to low sorts cheapest first
+
+- **Where:** `listPlants` in `api/src/store.ts` (`sort=price-desc` uses the same ascending comparator as `price-asc`); Browse follows the API via `GET /api/plants`
+- **Category:** Business rules in the API
+- **Impact:** Choosing **Price: high to low** shows the cheapest plants first (for example Succulent Cutting at $0.99), not the most expensive.
+- **Evidence:** `tests/api/plants.spec.ts`, test "GET /api/plants?sort=price-desc lists the most expensive plant first" (executed): first item price `0.99`, max in page `189`. `tests/e2e/browse.spec.ts`, test "Price: high to low shows the most expensive plant first" (executed): first card heading is "Succulent Cutting", not the Thai Constellation collector plant. Code: `case 'price-desc':` falls through with `results.sort((a, b) => a.price - b.price)`.
+- **Contradicts:** `docs/PRODUCT.md`: "**Price: high to low (most expensive first)**." OpenAPI on `GET /api/plants`: `price-desc (highest first)`.
+- **Suggested fix:** Sort `price-desc` with `(a, b) => b.price - a.price`.
+
+### F-06. Plant detail JSON sends rating as a string
+
+- **Where:** `getPlant` in `api/src/store.ts` (`rating: plant.rating.toFixed(1)`); `GET /api/plants/{plantId}`
+- **Category:** The contract
+- **Impact:** Clients and schema validators that expect a number (per OpenAPI) reject or mis-parse plant detail responses; list responses still use a numeric rating.
+- **Evidence:** `tests/api/plants.spec.ts`, test "GET /api/plants/{plantId} returns a plant that matches Plant" (executed): Ajv error `/rating must be number`. Example body: `"rating":"4.7"` from `GET /api/plants/pl-monstera` (executed).
+- **Contradicts:** OpenAPI `Plant` / `PlantSummary`: `rating` is a number (0–5). `listPlants` via `summary()` returns a number; only the detail endpoint stringifies.
+- **Suggested fix:** Return `plant.rating` (or a numeric rounded value), not `toFixed(1)`.
+
 ## Suspicions — not yet tested
 
 Things that look different from `docs/PRODUCT.md` (or the API contract), from reading the code and walking the app once. Each one needs a test before it becomes a finding. "Seen" means it showed up once on the walk; "code" means it comes from reading the source only.
@@ -72,7 +90,7 @@ Things that look different from `docs/PRODUCT.md` (or the API contract), from re
 
 ### Rules to prove next (no sign of a problem yet, but `docs/PRODUCT.md` stresses them)
 
-- Sorting, especially "**Price: high to low (most expensive first)**" — test every sort through `GET /api/plants` and the UI.
+- Remaining sort modes (featured, price-asc, name, best rated) through `GET /api/plants` and the UI — **price-desc** covered by F-05 (executed).
 - Shipping at the boundary — "**Shipping costs $6.95, and is free when the subtotal is $50.00 or more.**": Bird of Paradise at exactly $50, and a subtotal just below.
 - Order privacy at the API — Ben requests Ava's order with `GET /api/orders/{orderId}` and must get 404 "Order not found"; the same for Ava's cart lines with `PATCH` and `DELETE /api/cart/lines/{lineId}`.
 - "Placing an order charges the cart as it is, lowers the stock, and empties the cart." and "Orders are listed newest first."
