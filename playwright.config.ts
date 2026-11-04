@@ -39,5 +39,11 @@ export default defineConfig({
       use: { baseURL: webURL },
       dependencies: ['setup'],
     },
+    {
+      name: 'a11y',
+      testMatch: /a11y\/.*\.spec\.ts/,
+      use: { baseURL: webURL },
+      dependencies: ['setup'],
+    },
   ],
 });

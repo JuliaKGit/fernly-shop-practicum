@@ -71,6 +71,33 @@ One entry per issue, ordered by severity: money and privacy first, then broken f
 - **Contradicts:** OpenAPI `Plant` / `PlantSummary`: `rating` is a number (0–5). `listPlants` via `summary()` returns a number; only the detail endpoint stringifies.
 - **Suggested fix:** Return `plant.rating` (or a numeric rounded value), not `toFixed(1)`.
 
+### F-07. Plant card save buttons have no accessible name
+
+- **Where:** `PlantCard` save (heart) control on Browse (`web/src/components/PlantCard.tsx`); same pattern on every catalog card
+- **Category:** Accessibility
+- **Impact:** Screen-reader users hear an unnamed button on every plant card and cannot tell what it does (save / unsave).
+- **Evidence:** `tests/a11y/pages.spec.ts`, test "Browse" (executed under `npx playwright test --project=a11y`): axe `button-name`, **critical**, one failure per visible card (12 on the default page). Example target: `li:nth-child(1) > article > .PlantCard-module__save[type="button"]`; HTML is an icon-only `<button>` with `aria-pressed` and no `aria-label`. Attachments: `axe-results`, `axe-shot:Browse:button-name:*` on that run.
+- **Contradicts:** `docs/PRODUCT.md`: "every button and form field has a name a screen reader can announce."
+- **Suggested fix:** Add an `aria-label` that reflects saved state (for example "Save Monstera Deliciosa" / "Remove Monstera Deliciosa from saved").
+
+### F-08. Plant detail hero image has no alternative text
+
+- **Where:** Plant page hero `<img>` (`web/src/pages/PlantPage.tsx`)
+- **Category:** Accessibility
+- **Impact:** Screen-reader users get no description of the main product image on the plant page.
+- **Evidence:** `tests/a11y/pages.spec.ts`, test "Plant" (executed under `npx playwright test --project=a11y`): axe `image-alt`, **critical**, target `img` — `<img class="Pages-module__heroImage" src="/plants/monstera.svg">` with no `alt`. Attachment: `axe-shot:Plant:image-alt:0`.
+- **Contradicts:** `docs/PRODUCT.md`: "every meaningful image has alternative text."
+- **Suggested fix:** Set `alt` to the plant name (or a short descriptive phrase including the plant name).
+
+### F-09. Price text fails WCAG colour contrast
+
+- **Where:** `PriceTag` (`web/src/components/PriceTag.module.css` — foreground `#8dbb8a`) on Browse cards, plant detail, cart lines, order summary, checkout
+- **Category:** Accessibility
+- **Impact:** Prices are hard to read for customers with low vision or on bright screens; the shop fails WCAG contrast requirements on money labels across the purchase flow.
+- **Evidence:** `tests/a11y/pages.spec.ts` (executed under `npx playwright test --project=a11y`): axe `color-contrast`, **serious** — **Browse** (price on each card, ~2.18:1 on `#ffffff`); **Plant** (large price ~2.06:1 on `#f6faf3`); **Cart** (five price spans, ~2.18:1 on `#ffffff`); **Checkout** (subtotal/total, ~2.18:1). Same component: `web/cypress/component/PriceTag.cy.tsx`, test "PT-16 meets contrast on page background for each size" (executed under `npm run cy:component`). Screenshot: `web/cypress/screenshots/PriceTag.cy.tsx/PriceTag -- PT-16 meets contrast on page background for each size (failed).png`.
+- **Contradicts:** `docs/PRODUCT.md`: "text has enough contrast against its background (4.5:1 for normal text)." Fernly aims for **WCAG 2.1 level AA** on every page.
+- **Suggested fix:** Darken price colour (or change background) so normal and large text meet 4.5:1 / 3:1 as required.
+
 ## Suspicions — not yet tested
 
 Things that look different from `docs/PRODUCT.md` (or the API contract), from reading the code and walking the app once. Each one needs a test before it becomes a finding. "Seen" means it showed up once on the walk; "code" means it comes from reading the source only.
@@ -81,10 +108,7 @@ Things that look different from `docs/PRODUCT.md` (or the API contract), from re
 - **Order page after signing out and in as another customer** (Caching / Authorization) — code: sign-out drops the cached cart and order list but not single orders (`['order', id]`), so the second customer may briefly see the first customer's order from the cache. *May contradict:* "An order is private: only the customer who placed it can see it. Anyone else gets "Order not found"" and "Signing out forgets the session on this device."
 - **`CareLevelBadge` for level 3** (Components) — seen: three-dot plants (Fiddle Leaf Fig, Calathea Orbifolia, String of Pearls) say "Moderate care"; code: `LABELS[Math.min(level, 2) - 1]`. *May contradict:* "Care level has three steps: 1 **Easy**, 2 **Moderate**, 3 **Expert**." and the contract's `careLevel` "1 Easy, 2 Moderate, 3 Expert."
 - **Plant page quantity after a "Likes the same light" link** (Pages) — code: quantity and size are page state that isn't reset when the plant id changes. *May contradict:* "**Quantity** starts at 1 …"
-- **Search box input** (Accessibility) — seen: the accessibility tree lists a `searchbox` with no name; code: "Search plants" is a visual hint, not a label. *May contradict:* "every button and form field has a name a screen reader can announce."
-- **`PlantCard` heart (save) button** (Accessibility) — seen: every save button has no accessible name; code: icon-only, the SVG is `aria-hidden` and there is no `aria-label`. *May contradict:* "every button and form field has a name a screen reader can announce."
-- **Plant page hero image** (Accessibility) — seen and code: the `<img>` has no `alt` attribute. *May contradict:* "every meaningful image has alternative text."
-- **`PriceTag` colour** (Accessibility) — **Evidence:** `web/cypress/component/PriceTag.cy.tsx`, test "PT-16 meets contrast on page background for each size", fails under `npm run cy:component` (executed): computed contrast ~2.07:1 on `#f6faf3` for `sm` (needs ≥4.5:1). Screenshot: `web/cypress/screenshots/PriceTag.cy.tsx/PriceTag -- PT-16 meets contrast on page background for each size (failed).png`. *May contradict:* "text has enough contrast against its background (4.5:1 for normal text)."
+- **Search box input** (Accessibility) — seen: the accessibility tree lists a `searchbox` with no name; code: "Search plants" is a visual hint, not a label. Browse axe scan (`tests/a11y/pages.spec.ts`, test "Browse") did not report a separate rule failure for it (not yet tested with a dedicated assertion). *May contradict:* "every button and form field has a name a screen reader can announce."
 - **Search box focus** (Accessibility) — code: `.input { outline: none; }` in `SearchBox.module.css`, with no other focus style on the input or form. *May contradict:* "everything works with the keyboard alone, and focus is always visible."
 - **Page titles** (Accessibility) — seen: every page, including Cart, Checkout and "Page not found", has the title "Fernly — plants for every windowsill". *May contradict:* "Fernly aims for **WCAG 2.1 level AA** on every page" (WCAG 2.4.2 Page Titled).
 
