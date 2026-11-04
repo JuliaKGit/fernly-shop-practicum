@@ -31,11 +31,19 @@ const baselinePath = join(dirname(fileURLToPath(import.meta.url)), 'a11y-baselin
 
 let cachedBaseline: BaselineEntry[] | null = null;
 
+export function loadBaselineFrom(filePath: string): BaselineEntry[] {
+  const raw = readFileSync(filePath, 'utf8');
+  return JSON.parse(raw) as BaselineEntry[];
+}
+
 export function loadBaseline(): BaselineEntry[] {
   if (cachedBaseline) return cachedBaseline;
-  const raw = readFileSync(baselinePath, 'utf8');
-  cachedBaseline = JSON.parse(raw) as BaselineEntry[];
+  cachedBaseline = loadBaselineFrom(baselinePath);
   return cachedBaseline;
+}
+
+export function baselineEntryKey(entry: BaselineEntry): string {
+  return `${entry.page}\0${entry.rule}\0${entry.target}\0${entry.owner}\0${entry.expires}`;
 }
 
 export function serializeAxeTarget(target: UnlabelledFrameSelector): string {
