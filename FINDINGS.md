@@ -17,12 +17,12 @@ One entry per issue, ordered by severity: money and privacy first, then broken f
 
 ## Findings
 
-### F-01. A plant priced at 0 is shown as $0, not $0.00
+### F-01. Prices drop trailing zeros (and zero shows as $0)
 
-- **Where:** Browse plant card (`PriceTag` / `formatPrice` in `web/src/money.ts`)
+- **Where:** `formatPrice` in `web/src/money.ts`, used by `PriceTag` and `OrderSummary` (Browse, Cart, Checkout, Orders)
 - **Category:** Components
-- **Impact:** A free plant looks unpriced, and the same formatter drops the second decimal on every other price.
-- **Evidence:** `web/cypress/ui/browse.cy.ts`, test "shows $0.00 for a plant priced at 0", fails under `npm run cy:ui` (executed). The stubbed card (`price: 0` in `web/cypress/fixtures/plants/browse-zero-price.json`) renders `$0`. Screenshot: `web/cypress/screenshots/browse.cy.ts/Browse page -- shows $0.00 for a plant priced at 0 (failed).png`.
+- **Impact:** Money looks inconsistent and sometimes unpriced; free-shipping hints and totals do not always show two decimals.
+- **Evidence:** `web/cypress/ui/browse.cy.ts`, test "shows $0.00 for a plant priced at 0" (executed). `web/cypress/ui/cart.cy.ts`: **CP-02** expects `$50.00` but subtotal/total render `$50`; **CP-03** expects `Add $10.00 more…` but the hint uses `$10`; **CP-05** expects `$0.00` on a zero line but renders `$0`. Screenshots under `web/cypress/screenshots/cart.cy.ts/` for those tests.
 - **Contradicts:** `docs/PRODUCT.md`: "Every price is shown in dollars with **two decimals**, everywhere: `$12.50`, never `$12.5`."
 - **Suggested fix:** Format with two fraction digits (`amount.toFixed(2)`) so 0 is `$0.00`.
 
@@ -40,24 +40,33 @@ One entry per issue, ordered by severity: money and privacy first, then broken f
 - **Where:** `QuantityStepper` component (`web/src/components/QuantityStepper.tsx`), used on the plant page and in cart lines
 - **Category:** Components
 - **Impact:** A customer can raise the quantity one above the stock left, asking for a plant the shop doesn't have.
-- **Evidence:** `web/cypress/component/QuantityStepper.cy.tsx`, test "disables + at the stock limit", fails under `npm run cy:component`. It mounts the stepper with `value={3}` and `max={3}`, and the "Increase quantity" button is not disabled. Screenshot: `web/cypress/screenshots/QuantityStepper.cy.tsx/QuantityStepper -- disables + at the stock limit (failed).png`. The other three stepper tests pass (+ and − call `onChange` with the new value, − is disabled at the minimum).
+- **Evidence:** `web/cypress/component/QuantityStepper.cy.tsx`, test "disables + at the stock limit", fails under `npm run cy:component`. `web/cypress/ui/cart.cy.ts`, **CP-10** (executed): cart line at quantity 3 with stock 3 leaves **Increase quantity** enabled. Screenshots: `web/cypress/screenshots/QuantityStepper.cy.tsx/…` and `web/cypress/screenshots/cart.cy.ts/Cart page -- CP-10 … (failed).png`.
 - **Contradicts:** `docs/PRODUCT.md`: "**Quantity** starts at 1 and can never go above the stock left: at the stock limit, the **+** button is disabled."
 - **Suggested fix:** Disable + when `value >= max` instead of `value > max`.
+
+### F-04. A rejected cart quantity change shows no error toast
+
+- **Where:** Cart page (`web/src/pages/CartPage.tsx`) when `PATCH /api/cart/lines/{lineId}` fails
+- **Category:** Pages
+- **Impact:** When the shop rejects a quantity change (for example not enough stock), the customer gets no feedback; the quantity stays the same with no explanation.
+- **Evidence:** `web/cypress/ui/cart.cy.ts`, **CP-13** (executed): stubbed PATCH returns 400 `{ detail: "Not enough stock left." }`; quantity stays 1 but no `role="status"` toast with that message. Screenshot: `web/cypress/screenshots/cart.cy.ts/Cart page -- CP-13 … (failed).png`.
+- **Contradicts:** `docs/APP-MAP.md` `/cart`: "**Change rejected:** error toast with the API's `detail`."
+- **Suggested fix:** Ensure failed `updateLine` / `removeLine` mutations surface `error.message` in the cart `Toast` (same pattern as the plant page add-to-cart error).
 
 ## Suspicions — not yet tested
 
 Things that look different from `docs/PRODUCT.md` (or the API contract), from reading the code and walking the app once. Each one needs a test before it becomes a finding. "Seen" means it showed up once on the walk; "code" means it comes from reading the source only.
 
 - **Plant page after a "Likes the same light" link** (Caching) — seen: the address bar said `/plants/pl-fiddle` while the page still showed Bird of Paradise at $50; code: `usePlant` caches every plant under the same key `['plant']`, so Add to cart may add the wrong plant. *May contradict:* "The plant page always shows the plant in the address bar, including after following a "Likes the same light" link."
-- **`formatPrice` on other surfaces** (Components) — F-01 proves a Browse card priced at 0 renders `$0`. Still not tested: plant page, size deltas, cart, and checkout, where the same formatter was seen as `$22`, `$27.5`, `$12.5`, `$50`, `+$6`. *May contradict:* the same two-decimals line as F-01.
-- **Cart line stepper** (Components / Business rules in the API) — code: the same stepper as F-03 lets a cart line ask for stock + 1, so only the API's `stock_limit` stands in the way. *May contradict:* "A line can never hold more than the plant's stock."
+- **`PriceTag` / `formatPrice` two-decimal display** (Components) — **Evidence:** `web/cypress/component/PriceTag.cy.tsx`, rows PT-01, PT-02, PT-04, PT-07, PT-11, PT-12, PT-13 fail under `npm run cy:component` (executed). Examples: `amount={12.5}` renders `$12.5` not `$12.50`; `amount={50}` → `$50`; `amount={0}` → `$0`; `0.1 + 0.2` → `$0.3`; labelled mount renders `Subtotal: $12.5`. Same root as F-01 (`web/src/money.ts`). Screenshots under `web/cypress/screenshots/PriceTag.cy.tsx/`. *May contradict:* the same two-decimals line as F-01.
+- **`formatPrice` on other surfaces** (Components) — F-01 covers Browse (zero price); Cart (CP-02, CP-03, CP-05); PriceTag component rows above. Still not tested: plant page, size deltas, checkout, orders. *May contradict:* the same two-decimals line as F-01.
 - **Order page after signing out and in as another customer** (Caching / Authorization) — code: sign-out drops the cached cart and order list but not single orders (`['order', id]`), so the second customer may briefly see the first customer's order from the cache. *May contradict:* "An order is private: only the customer who placed it can see it. Anyone else gets "Order not found"" and "Signing out forgets the session on this device."
 - **`CareLevelBadge` for level 3** (Components) — seen: three-dot plants (Fiddle Leaf Fig, Calathea Orbifolia, String of Pearls) say "Moderate care"; code: `LABELS[Math.min(level, 2) - 1]`. *May contradict:* "Care level has three steps: 1 **Easy**, 2 **Moderate**, 3 **Expert**." and the contract's `careLevel` "1 Easy, 2 Moderate, 3 Expert."
 - **Plant page quantity after a "Likes the same light" link** (Pages) — code: quantity and size are page state that isn't reset when the plant id changes. *May contradict:* "**Quantity** starts at 1 …"
 - **Search box input** (Accessibility) — seen: the accessibility tree lists a `searchbox` with no name; code: "Search plants" is a visual hint, not a label. *May contradict:* "every button and form field has a name a screen reader can announce."
 - **`PlantCard` heart (save) button** (Accessibility) — seen: every save button has no accessible name; code: icon-only, the SVG is `aria-hidden` and there is no `aria-label`. *May contradict:* "every button and form field has a name a screen reader can announce."
 - **Plant page hero image** (Accessibility) — seen and code: the `<img>` has no `alt` attribute. *May contradict:* "every meaningful image has alternative text."
-- **`PriceTag` colour** (Accessibility) — seen: `#8dbb8a` on the page background `#f6faf3` measures 2.07:1, below 4.5:1 (and below the 3:1 allowed for large text). *May contradict:* "text has enough contrast against its background (4.5:1 for normal text)."
+- **`PriceTag` colour** (Accessibility) — **Evidence:** `web/cypress/component/PriceTag.cy.tsx`, test "PT-16 meets contrast on page background for each size", fails under `npm run cy:component` (executed): computed contrast ~2.07:1 on `#f6faf3` for `sm` (needs ≥4.5:1). Screenshot: `web/cypress/screenshots/PriceTag.cy.tsx/PriceTag -- PT-16 meets contrast on page background for each size (failed).png`. *May contradict:* "text has enough contrast against its background (4.5:1 for normal text)."
 - **Search box focus** (Accessibility) — code: `.input { outline: none; }` in `SearchBox.module.css`, with no other focus style on the input or form. *May contradict:* "everything works with the keyboard alone, and focus is always visible."
 - **Page titles** (Accessibility) — seen: every page, including Cart, Checkout and "Page not found", has the title "Fernly — plants for every windowsill". *May contradict:* "Fernly aims for **WCAG 2.1 level AA** on every page" (WCAG 2.4.2 Page Titled).
 
