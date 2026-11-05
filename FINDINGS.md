@@ -17,6 +17,15 @@ One entry per proven issue, ordered by severity: money and privacy first, then b
 
 ## Findings
 
+### F-02: A plant priced 0 is shown as $0, not $0.00
+
+- **Where:** Browse plant cards, via `PriceTag` and `formatPrice` (`web/src/money.ts`)
+- **Category:** Components
+- **Impact:** A free plant looks unpriced, and the shop does not keep the two-decimal prices it promises.
+- **Evidence:** `web/cypress/ui/browse.cy.ts`, "shows $0.00 for a plant priced 0": the Gift Fern card renders `$0` (`npm run cy:ui`, 3 passing, 2 failing; screenshot in `web/cypress/screenshots/browse.cy.ts/`). `formatPrice` returns `` `$${Math.round(amount * 100) / 100}` ``, so a whole number never gains `.00` (inspected).
+- **Contradicts:** PRODUCT.md: "Every price is shown in dollars with two decimals, everywhere: `$12.50`, never `$12.5`."
+- **Suggested fix (optional):** Format with two fraction digits, for example `amount.toFixed(2)`.
+
 ### F-01: The + button stays enabled at the stock limit
 
 - **Where:** `QuantityStepper` (`web/src/components/QuantityStepper.tsx`), used on the plant page and in the cart
@@ -26,6 +35,15 @@ One entry per proven issue, ordered by severity: money and privacy first, then b
 - **Contradicts:** PRODUCT.md: "Quantity starts at 1 and can never go above the stock left: at the stock limit, the + button is disabled."
 - **Suggested fix (optional):** Disable + at `value >= max` instead of `value > max`.
 
+### F-03: A catalog load failure looks like an empty shop, with no Try again
+
+- **Where:** Browse page (`web/src/pages/BrowsePage.tsx`)
+- **Category:** Pages
+- **Impact:** When the catalog cannot be loaded, a customer is told that no plants match their filters and is given no way to retry.
+- **Evidence:** `web/cypress/ui/browse.cy.ts`, "shows an error and Try again when the catalog cannot be loaded": `GET /api/plants?*` stubbed with 500. The page has no `role="alert"` and no Try again button; it shows the headings "0 plants" and "No plants match your filters" (`npm run cy:ui`, 3 passing, 2 failing; screenshot in `web/cypress/screenshots/browse.cy.ts/`).
+- **Contradicts:** PRODUCT.md: "If the catalog can't be loaded, the page says so and offers **Try again**. It never pretends there are no plants."
+- **Suggested fix (optional):** Render `ErrorBanner` with Try again when `plants.isError`, and use the empty state only for an empty list.
+
 ## Suspicions — not yet tested
 
 These come from reading the code and from the first walk-through of the shop. "Seen" means it showed up in the browser during mapping, which is still not a test. Each one should become a finding with a test, or be dropped.
@@ -33,7 +51,6 @@ These come from reading the code and from the first walk-through of the shop. "S
 ### Money
 
 - **Shipping is charged at exactly $50.00** (`api/src/store.ts` `cart()` uses `subtotal > FREE_SHIPPING_FROM`; seen: one Bird of Paradise, $50 subtotal, $6.95 shipping, $56.95 total) — may contradict PRODUCT.md: "Shipping costs $6.95, and is free when the subtotal is $50.00 or more."
-- **Prices drop trailing zeros** (`web/src/money.ts` `formatPrice` returns `$22`, `$27.5`, `+$6`; seen on cards, the plant page, the cart and the order) — may contradict PRODUCT.md: "Every price is shown in dollars with two decimals, everywhere: `$12.50`, never `$12.5`."
 - **"Price: high to low" lists the cheapest plant first** (`store.ts` `listPlants` uses the same ascending comparator for `price-asc` and `price-desc`; seen: `?sort=price-desc` starts with Succulent Cutting $0.99) — may contradict PRODUCT.md: "Price: high to low (most expensive first)" and OpenAPI `GET /plants`: "price-desc (highest first)".
 
 ### Privacy
@@ -44,7 +61,6 @@ These come from reading the code and from the first walk-through of the shop. "S
 ### Broken flows
 
 - **The plant page shows the previous plant after a "Likes the same light" link** (`web/src/api/queries.ts` `usePlant` caches under `['plant']` with no id; seen: from Snake Plant, clicking ZZ Plant gives the URL `/plants/pl-zz` but still shows Snake Plant, $22, 20 in stock; Add to cart there would add Snake Plant) — may contradict PRODUCT.md: "The plant page always shows the plant in the address bar, including after following a 'Likes the same light' link."
-- **A catalog load failure looks like "no matching plants", with no Try again** (`BrowsePage` renders the same `EmptyState` for `plants.isError` and for an empty list) — may contradict PRODUCT.md: "If the catalog can't be loaded, the page says so and offers Try again. It never pretends there are no plants."
 
 ### Components and the contract
 
