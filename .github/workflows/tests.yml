@@ -9,9 +9,9 @@ jobs:
   cypress:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -32,7 +32,7 @@ jobs:
 
       - name: Upload Cypress screenshots
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cypress-screenshots
           path: web/cypress/screenshots
@@ -44,9 +44,9 @@ jobs:
       FERNLY_USER_EMAIL: ava@fernly.test
       FERNLY_USER_PASSWORD: Fernly-Ava-2026
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload Playwright HTML report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report
@@ -70,7 +70,7 @@ jobs:
 
       - name: Upload accessibility report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: a11y-report
           path: a11y-report
