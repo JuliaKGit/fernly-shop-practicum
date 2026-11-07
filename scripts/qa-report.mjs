@@ -77,7 +77,22 @@ function readFindingsFile(filePath) {
   return parseFindings(readFileSync(filePath, 'utf8'));
 }
 
+const ZERO_SHA = '0000000000000000000000000000000000000000';
+
 function readBaseFindingsTitles(baseRef) {
+  const baseSha = env('BASE_SHA');
+  if (baseSha && baseSha !== ZERO_SHA) {
+    try {
+      const raw = execFileSync('git', ['show', `${baseSha}:FINDINGS.md`], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      return new Set(readFindingsFileFromString(raw).map((e) => e.title));
+    } catch {
+      /* fall through to ref */
+    }
+  }
   if (!baseRef) return new Set();
   try {
     const raw = execFileSync(
@@ -545,8 +560,12 @@ function publishCommand(args) {
   const dryRun = args.includes('--dry-run');
   const repo = env('GITHUB_REPOSITORY');
   const pr = env('PR_NUMBER');
-  if (!repo || !pr) {
-    console.error('publish requires GITHUB_REPOSITORY and PR_NUMBER');
+  if (!pr) {
+    console.log('No PR_NUMBER — skipping publish (artifact-only run).');
+    return;
+  }
+  if (!repo) {
+    console.error('publish requires GITHUB_REPOSITORY');
     process.exit(2);
   }
 
