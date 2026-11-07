@@ -1,13 +1,36 @@
 import dotenv from 'dotenv';
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 dotenv.config();
 
 const apiURL = process.env.API_URL ?? 'http://localhost:8100';
 const webURL = process.env.WEB_URL ?? 'http://localhost:5173';
 
+const visualProject =
+  process.env.CI || process.env.VISUAL
+    ? [
+        {
+          name: 'visual',
+          testDir: 'tests/visual',
+          testMatch: /.*\.spec\.ts/,
+          dependencies: ['setup' as const],
+          use: {
+            baseURL: webURL,
+            ...devices['Desktop Chrome'],
+            viewport: { width: 1280, height: 800 },
+          },
+        },
+      ]
+    : [];
+
 export default defineConfig({
   testDir: 'tests',
+  expect: {
+    toHaveScreenshot: {
+      animations: 'disabled',
+      maxDiffPixels: 0,
+    },
+  },
   reporter: [
     ['list'],
     ['html', { open: 'never' }],
@@ -56,5 +79,6 @@ export default defineConfig({
       use: { baseURL: webURL },
       dependencies: ['setup'],
     },
+    ...visualProject,
   ],
 });
