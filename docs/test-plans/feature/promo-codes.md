@@ -1,6 +1,6 @@
 # Test plan: feature/promo-codes
 
-**Status:** not approved. Do not dispatch specialists or write tests until a human approves this file.
+**Status:** approved in chat. Specialists may write tests. Do not change application code. Rows Q1–Q4 stay unresolved (`assumed — ask`) and get no test.
 
 ## Summary
 
