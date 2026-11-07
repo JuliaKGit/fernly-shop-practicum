@@ -97,6 +97,70 @@ One entry per issue, ordered by severity: money and privacy first, then broken f
 - **Evidence:** `tests/a11y/pages.spec.ts` (executed under `npx playwright test --project=a11y`): axe `color-contrast`, **serious** — **Browse** (price on each card, ~2.18:1 on `#ffffff`); **Plant** (large price ~2.06:1 on `#f6faf3`); **Cart** (five price spans, ~2.18:1 on `#ffffff`); **Checkout** (subtotal/total, ~2.18:1). Same component: `web/cypress/component/PriceTag.cy.tsx`, test "PT-16 meets contrast on page background for each size" (executed under `npm run cy:component`). Screenshot: `web/cypress/screenshots/PriceTag.cy.tsx/PriceTag -- PT-16 meets contrast on page background for each size (failed).png`.
 - **Contradicts:** `docs/PRODUCT.md`: "text has enough contrast against its background (4.5:1 for normal text)." Fernly aims for **WCAG 2.1 level AA** on every page.
 - **Suggested fix:** Darken price colour (or change background) so normal and large text meet 4.5:1 / 3:1 as required.
+- **Further evidence (executed):** `tests/a11y/promo.spec.ts` **X1 checkout of a discounted cart** and **X1 a paid order with a discount line** (`npx playwright test tests/a11y/promo.spec.ts --project=a11y`). Both are new pages for the baseline, so price colour is a blocking `color-contrast` failure: `#8dbb8a` on `#ffffff` at about 2.18:1 (subtotal, shipping, and the large total). The discount line itself is a darker green and passed the 4.5:1 checks in `web/cypress/component/OrderSummary.cy.tsx` **C1-06**, `web/cypress/ui/checkout-promo.cy.ts` **U2-06**, and `web/cypress/ui/orders-promo.cy.ts` **U3-08**.
+
+### F-10. A percentage code also takes 10% off shipping
+
+- **Where:** `POST /api/cart/promo` and the cart total (`LEAFY10`), then the order copied from that cart
+- **Category:** Business rules in the API
+- **Impact:** The customer is undercharged: shipping is discounted even though the percentage applies only to plants. One Small Pothos ($12.50 + $6.95 shipping) is discounted $1.95 instead of $1.25, so the total is $17.50 instead of $18.20.
+- **Evidence:** `tests/api/promo-codes.spec.ts` (executed, `npx playwright test tests/api/promo-codes.spec.ts --project=api`). **M1** on one Small Pothos: discount `1.95` (expected `1.25`). Succulent Cutting: discount `0.79` (expected `0.10`). Fiddle Leaf Fig at $49.00: discount `5.60` (expected `4.90`). Quantity raised to 2: discount `3.20` (expected `2.50`). **M3** Bird of Paradise at $50.00: discount `5.70` (expected `5.00`), which is 10% of $50.00 + $6.95. **M4** and **SCH1** place that Pothos order and the order’s discount is `1.95` as well. **B1** `leafy10` fails on the same `1.95`. The browser shows it too: `tests/e2e/promo-codes.spec.ts` **E1 applying leafy10…** does not find `−$1.25` or `$18.20` on the cart, checkout, paid summary, or orders list (Discount (LEAFY10) and `$6.95` do show). Checkout and order axe output render the total as `$17.5`.
+- **Contradicts:** `docs/features/promo-codes.md`: “A percentage code takes that percentage off the subtotal of the plants — never off shipping.” OpenAPI on `POST /api/cart/promo`: percentage off the plant subtotal, never off shipping. Cart `discount`: “Promo discount on the plants, never on shipping.”
+- **Suggested fix:** Compute the percentage from the plant subtotal only, then add shipping after that.
+
+### F-11. A cart of exactly $50.00 still pays $6.95 shipping
+
+- **Where:** Cart totals (`GET /api/cart`, `POST /api/cart/lines`) for `pl-bird` size `S`
+- **Category:** Business rules in the API
+- **Impact:** Bird of Paradise at the free-shipping line is still charged $6.95 for shipping.
+- **Evidence:** `tests/api/promo-codes.spec.ts` **SCH1 a $50.00 Bird of Paradise with no code ships free** (executed): shipping `6.95`, expected `0`. **M2** `FREESHIP` on that same plant does return shipping `0`, because the free-shipping code clears the fee after the threshold check.
+- **Contradicts:** `docs/PRODUCT.md`: “Shipping costs $6.95, and is free when the subtotal is $50.00 or more.” `docs/APP-MAP.md`: `pl-bird` at exactly $50 is the free-shipping line.
+- **Suggested fix:** Treat the threshold as $50.00 or more, not strictly greater than $50.00.
+
+### F-12. The expired code SPRING5 is accepted
+
+- **Where:** `POST /api/cart/promo`
+- **Category:** Business rules in the API
+- **Impact:** A customer can still use `SPRING5` (ended 30 Apr 2026) and get 5% off, and the cart never shows the expired-code message.
+- **Evidence:** `tests/api/promo-codes.spec.ts` **N1 an expired code is refused…** and **N1 spring5 is refused as expired…** (executed): both `SPRING5` and `spring5` return `200`, expected `400` with `rule` `promo_invalid` and a detail that says the code has expired. `tests/e2e/promo-codes.spec.ts` **E1 an expired code is announced…** and `tests/a11y/promo.spec.ts` **X1 an expired-code refusal…** then find no alert containing “expired”.
+- **Contradicts:** `docs/features/promo-codes.md`: “Expired codes are refused, with a message that says the code has expired.” Codes table: `SPRING5` “30 Apr 2026 (expired)”. OpenAPI: expired or unknown codes are refused (`promo_invalid`).
+- **Suggested fix:** Refuse a code whose last valid day is before today, with `rule` `promo_invalid` and a detail that says it has expired, and leave any code already on the cart in place.
+
+### F-13. Another signed-in customer can open someone else’s order
+
+- **Where:** `GET /api/orders/{orderId}`
+- **Category:** Authorization
+- **Impact:** Ben can read Ava’s order, including her promo code and discount. His own cart does not inherit her code.
+- **Evidence:** `tests/api/promo-codes.spec.ts` **P1 another customer cannot see the code or the discounted order** (executed, re-run after the 404 check was ordered ahead of the cent check). Ben’s `GET /api/cart` stays `promoCode` null and `discount` 0. Ava’s `GET /api/orders/{orderId}` is `200` with `promoCode` `LEAFY10`. Ben’s `GET` of that same id is `200`, expected `404` with no `rule`.
+- **Contradicts:** `docs/PRODUCT.md`: “An order is private: only the customer who placed it can see it. Anyone else gets ‘Order not found’.” `docs/APP-MAP.md`: `GET /api/orders/{orderId}` returns 404 to anyone who didn’t place the order, and a 404 has no `rule`.
+- **Suggested fix:** Return 404 when the order’s customer is not the caller.
+
+### F-14. The cart hides the promo field once a code is applied, so a new code cannot replace it
+
+- **Where:** Cart page promo slot (`PromoCodeInput` when `appliedCode` is set)
+- **Category:** Pages
+- **Impact:** After Apply, the customer only sees Remove. They cannot type a second code. The documented behaviour is that a new code replaces the old one.
+- **Evidence:** `tests/e2e/promo-codes.spec.ts` **E1 FREESHIP replaces LEAFY10 and Remove restores paid shipping** (executed): after `LEAFY10` is applied, the promo textbox is gone. The API itself does replace codes: `tests/api/promo-codes.spec.ts` **B1 a later FREESHIP replaces LEAFY10** passed (`promoCode` `FREESHIP`, shipping `0`, total `12.50`). `web/cypress/ui/cart-promo.cy.ts` **U1-08** fails earlier because the field has no accessible name (F-15), so it never reaches the second Apply.
+- **Contradicts:** `docs/features/promo-codes.md`: “One code per cart. Applying a new code replaces the old one.”
+- **Suggested fix:** Keep a way to submit a new code while one is applied, and send that code to `POST /api/cart/promo` so the server replaces it.
+
+### F-15. The promo code field has no visible label and no accessible name
+
+- **Where:** `PromoCodeInput` on the cart
+- **Category:** Accessibility
+- **Impact:** A screen-reader user hears an unnamed text field. The only nearby text is “Have a promo code?”, and it is not a label for the field.
+- **Evidence:** `web/cypress/component/PromoCodeInput.cy.tsx` **C2-01** (and C2-02, C2-04, C2-05, C2-07, C2-09, C2-12, which look up the field by that name) under `npx cypress run --component --spec cypress/component/PromoCodeInput.cy.tsx` (executed). The accessible name of the input is empty. Screenshot: `web/cypress/screenshots/PromoCodeInput.cy.tsx/PromoCodeInput -- C2-01 shows a visible Promo code label and an Apply button (failed).png`. `tests/a11y/promo.spec.ts` **X1 cart with a line and an empty promo field**: axe `label`, **critical**, target the promo `<input>`. `tests/e2e/promo-codes.spec.ts` **E1 the promo field has a visible Promo code label…** does not find a textbox named “Promo code”. The same miss fails `web/cypress/ui/cart-promo.cy.ts` U1-01, U1-02, U1-05, U1-07, U1-08, and U1-09.
+- **Contradicts:** `docs/features/promo-codes.md`: “The code field has a visible label.” `docs/PRODUCT.md`: “every button and form field has a name a screen reader can announce.”
+- **Suggested fix:** Add a visible `<label for>` with the text “Promo code”.
+
+### F-16. A promo error is not announced to a screen reader
+
+- **Where:** `PromoCodeInput` error text
+- **Category:** Accessibility
+- **Impact:** When a code is refused, a sighted customer may see the message, but a screen-reader user is not told as soon as it appears.
+- **Evidence:** `web/cypress/component/PromoCodeInput.cy.tsx` **C2-06** (executed) shows “This code has expired.” **C2-11** (executed) fails because that text is not inside `role="alert"` or `aria-live="assertive"`. Screenshot: `web/cypress/screenshots/PromoCodeInput.cy.tsx/PromoCodeInput -- C2-11 announces the expired message with contrast at least 4.51 (failed).png`. The live API never produces this message today (F-12), so the cart page cannot announce it either.
+- **Contradicts:** `docs/features/promo-codes.md`: “When a code is refused, the message is announced to screen-reader users as soon as it appears.”
+- **Suggested fix:** Render the error with `role="alert"`.
 
 ## Suspicions — not yet tested
 
@@ -104,7 +168,7 @@ Things that look different from `docs/PRODUCT.md` (or the API contract), from re
 
 - **Plant page after a "Likes the same light" link** (Caching) — seen: the address bar said `/plants/pl-fiddle` while the page still showed Bird of Paradise at $50; code: `usePlant` caches every plant under the same key `['plant']`, so Add to cart may add the wrong plant. *May contradict:* "The plant page always shows the plant in the address bar, including after following a "Likes the same light" link."
 - **`PriceTag` / `formatPrice` two-decimal display** (Components) — **Evidence:** `web/cypress/component/PriceTag.cy.tsx`, rows PT-01, PT-02, PT-04, PT-07, PT-11, PT-12, PT-13 fail under `npm run cy:component` (executed). Examples: `amount={12.5}` renders `$12.5` not `$12.50`; `amount={50}` → `$50`; `amount={0}` → `$0`; `0.1 + 0.2` → `$0.3`; labelled mount renders `Subtotal: $12.5`. Same root as F-01 (`web/src/money.ts`). Screenshots under `web/cypress/screenshots/PriceTag.cy.tsx/`. *May contradict:* the same two-decimals line as F-01.
-- **`formatPrice` on other surfaces** (Components) — F-01 covers Browse (zero price); Cart (CP-02, CP-03, CP-05); PriceTag component rows above. Still not tested: plant page, size deltas, checkout, orders. *May contradict:* the same two-decimals line as F-01.
+- **`formatPrice` on other surfaces** (Components) — F-01 covers Browse (zero price); Cart (CP-02, CP-03, CP-05); PriceTag component rows above. **Now also executed** on the promo summary: `web/cypress/component/OrderSummary.cy.tsx` **C1-01** renders `−$4`, `$40`, and `Add $10 more…` (expected `−$4.00`, `$40.00`, `Add $10.00 more…`); **C1-03** renders `−$4.9` and `Add $1 more…` (expected `−$4.90` and `Add $1.00 more…`). `web/cypress/ui/checkout-promo.cy.ts` **U2-01** total `$18.2` (expected `$18.20`); **U2-05** total `$12.5` (expected `$12.50`). `web/cypress/ui/orders-promo.cy.ts` **U3-01** and **U3-02** show `$18.2` (expected `$18.20`). Screenshots under `web/cypress/screenshots/OrderSummary.cy.tsx/`, `checkout-promo.cy.ts/`, and `orders-promo.cy.ts/`. Same root as F-01. Still not tested: plant page, size deltas.
 - **Order page after signing out and in as another customer** (Caching / Authorization) — code: sign-out drops the cached cart and order list but not single orders (`['order', id]`), so the second customer may briefly see the first customer's order from the cache. *May contradict:* "An order is private: only the customer who placed it can see it. Anyone else gets "Order not found"" and "Signing out forgets the session on this device."
 - **`CareLevelBadge` for level 3** (Components) — seen: three-dot plants (Fiddle Leaf Fig, Calathea Orbifolia, String of Pearls) say "Moderate care"; code: `LABELS[Math.min(level, 2) - 1]`. *May contradict:* "Care level has three steps: 1 **Easy**, 2 **Moderate**, 3 **Expert**." and the contract's `careLevel` "1 Easy, 2 Moderate, 3 Expert."
 - **Plant page quantity after a "Likes the same light" link** (Pages) — code: quantity and size are page state that isn't reset when the plant id changes. *May contradict:* "**Quantity** starts at 1 …"
@@ -112,11 +176,11 @@ Things that look different from `docs/PRODUCT.md` (or the API contract), from re
 - **Search box focus** (Accessibility) — code: `.input { outline: none; }` in `SearchBox.module.css`, with no other focus style on the input or form. *May contradict:* "everything works with the keyboard alone, and focus is always visible."
 - **Page titles** (Accessibility) — seen: every page, including Cart, Checkout and "Page not found", has the title "Fernly — plants for every windowsill". *May contradict:* "Fernly aims for **WCAG 2.1 level AA** on every page" (WCAG 2.4.2 Page Titled).
 
-### Rules to prove next (no sign of a problem yet, but `docs/PRODUCT.md` stresses them)
+### Rules to prove next
 
 - Remaining sort modes (featured, price-asc, name, best rated) through `GET /api/plants` and the UI — **price-desc** covered by F-05 (executed).
-- Shipping at the boundary — "**Shipping costs $6.95, and is free when the subtotal is $50.00 or more.**": Bird of Paradise at exactly $50, and a subtotal just below.
-- Order privacy at the API — Ben requests Ava's order with `GET /api/orders/{orderId}` and must get 404 "Order not found"; the same for Ava's cart lines with `PATCH` and `DELETE /api/cart/lines/{lineId}`.
+- Shipping at the boundary — **executed.** Exactly $50 fails: see **F-11**. A subtotal just below ($49.00 Fiddle + `LEAFY10`) still has shipping `$6.95` (`tests/api/promo-codes.spec.ts` **M3 a $49.00 subtotal still pays shipping after LEAFY10**, passed).
+- Order privacy at the API — **executed for the order.** Ben’s `GET /api/orders/{orderId}` returns 200: see **F-13**. Ben’s cart does not pick up Ava’s code (that check passed). `PATCH` / `DELETE` of another customer’s cart line is still not tested.
 - "Placing an order charges the cart as it is, lowers the stock, and empties the cart." and "Orders are listed newest first."
 - Search ignores case and matches Latin names; Low + Bright shows either; Pet-safe shows only pet-safe plants.
 - "Passwords have at least 8 characters; an email can have only one account."
