@@ -1,0 +1,31 @@
+# Test plan: feature/plant-reviews
+
+## Summary
+
+Adds customer reviews on the plant page: `GET`/`POST /api/plants/{plantId}/reviews`, `DELETE /api/reviews/{reviewId}`, and a Reviews slot with list, average, write form (signed-in), and star rating input. Seeded reviews ship with the API; one review per customer per plant; only the author may delete.
+
+## Plan
+
+| ID | area | what changed | risk to a customer | level | specialist | cases (positive / negative / edge / accessibility) | source |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| R1 | `DELETE /api/reviews/{reviewId}` | Authored delete; non-authors must not remove someone else's review | **Privacy** — another customer could erase a review that is not theirs | api | change-triage | **+** author deletes own review → 204, then GET no longer lists it. **−** signed-out → 401 `auth_required`. **−** other signed-in customer → 404 (not their review). **edge** unknown `reviewId` → 404. Schema/status per OpenAPI. | docs/features/plant-reviews.md: "Only the author can delete a review. Anyone else gets Review not found."; OpenAPI delete path |
+| R2 | `POST /api/plants/{plantId}/reviews` | Create review (auth, rating 1–5, text 10–500, one per plant) | **Sign-in / integrity** — guests posting, duplicate reviews, bad input accepted | api | change-triage | **+** signed-in customer posts valid rating+text → 201 + `Review` schema; author = user name. **−** no auth → 401. **−** second review same user+plant → 409 `already_reviewed` (seed: Ben already reviewed `pl-snake`). **−** rating 0 / 6 / non-int → 400. **−** text &lt;10 or &gt;500 → 400. **edge** unknown `plantId` → 404. | docs/features/plant-reviews.md: sign-in, 1–5 / 10–500, one per customer; OpenAPI POST |
+| R3 | `GET /api/plants/{plantId}/reviews` | List + average + count, newest first | Wrong average or order misleads buying decisions | api | change-triage | **+** known plant with seeds → 200 `ReviewList` schema; `count` matches; reviews newest-first by `createdAt`. **+** average for ratings 5,4,5 → **4.7** (one decimal, halves up). **edge** plant with no reviews → `average` 0, `count` 0, `reviews` []. **−** unknown plant → 404. | docs/features/plant-reviews.md: average / newest first / empty; OpenAPI GET description |
+| R4 | `StarRatingInput` | New radiogroup star control | Keyboard / SR users cannot set a rating | component | cypress-test-writer | **+** click star N → `onChange(N)`; selected stars styled on. **accessibility** `role="radiogroup"` named "Your rating"; each star `role="radio"` with name "N star(s)". **accessibility** Tab into group; arrow keys change rating; selected star announced (`aria-checked` / roving tabindex) like radio buttons. **edge** value 0 → none selected. | docs/features/plant-reviews.md: "star rating works with the keyboard like any group of radio buttons…"; docs/PRODUCT.md Accessibility |
+| R5 | `ReviewForm` | Write-a-review form (stars + text + submit) | Invalid or empty review submitted; unclear errors | component | cypress-test-writer | **+** rating + ≥10 chars → `onSubmit({ rating, text trimmed })`; fields clear. **−** rating 0 → alert "Choose a rating from 1 to 5 stars."; no submit. **−** text &lt;10 → alert "Write at least 10 characters." **edge** `busy` disables button / shows "Posting…". **edge** `error` prop shown as alert. **accessibility** textarea labelled "Your review"; errors `role="alert"`. | docs/features/plant-reviews.md: Write a review 1–5 / 10–500 |
+| R6 | `ReviewList` | Average line + review items / empty copy | Empty or wrong summary confuses shoppers | component | cypress-test-writer | **+** count&gt;0 shows "★ X.X out of 5 · N review(s)", author, stars, date (en-CA), text. **edge** count 0 → "No reviews yet. Be the first…". **edge** count 1 uses singular "review". **accessibility** rating has visually-hidden "N out of 5"; decorative ★ `aria-hidden`. | docs/features/plant-reviews.md: Reviews section / empty invite |
+| R7 | Plant page Reviews slot (`web/src/slots/plant-page/reviews.tsx`) | Wired list + form + auth gate + toast | Guests see write UI; post does not show in list; thank-you missing | ui | cypress-test-writer | **+** mocked GET with reviews → section "Reviews", average, items newest order. **+** signed-in → "Write a review" form; successful POST → toast "Thanks for your review!" and list refresh shows new review. **−** signed-out → "Sign in to write a review" (link to `/login?next=/plants/{id}`), no form. **−** GET error → ErrorBanner "Reviews couldn't be loaded." + retry. **edge** empty list → empty copy + form if signed in. **edge** POST `already_reviewed` / validation → form shows API error. | docs/features/plant-reviews.md: section, sign-in gate, appears right away, thanks |
+| R8 | Plant page reviews (live API) | End-to-end read/write on `/plants/:plantId` | Feature broken in real stack despite unit/UI mocks | e2e | change-triage | **+** open seeded plant → Reviews visible with average/count. **+** sign in as a customer who has not reviewed that plant → post stars+text → thanks toast; review appears in list without reload. **−** same customer posts again → error / blocked (one per plant). **−** signed-out user sees sign-in prompt, not the form. | docs/features/plant-reviews.md; docs/PRODUCT.md Plant page |
+| R9 | Plant page + Reviews | Axe scan of plant page including Reviews (signed out and signed in with form) | WCAG regressions on new section / star control / form | a11y | change-triage | Scan `/plants/{id}` with Reviews loaded (seeded plant). Scan signed-in state with Write a review form visible. Assert no new blocking axe violations (do not edit `a11y-baseline.json`). | docs/PRODUCT.md Accessibility (WCAG 2.1 AA); docs/features/plant-reviews.md star/keyboard |
+
+## Assumed — ask
+
+| Topic | Why |
+| --- | --- |
+| UI delete control | Feature/OpenAPI describe author-only delete, but the plant-page slot has no delete button. Confirm API-only for this PR, or missing UI. |
+| Loading copy | Slot shows "Loading reviews…" — not specified in docs/features/plant-reviews.md. Confirm expected copy. |
+| Average on seed `pl-snake` (5+4+5) | Doc example expects **4.7**; implementer must match documented rounding (halves up), not truncate. |
+
+## Stop
+
+Plan written for approval. Do not hand rows to specialists until approved.
