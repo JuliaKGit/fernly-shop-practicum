@@ -103,7 +103,7 @@ jobs:
           PROMPT
             printf '\nPR title: %s\n\nPR body:\n%s\n' "$PR_TITLE" "$PR_BODY"
           } >"$prompt"
-          agent -p --force --trust --output-format text <"$prompt" >"$RUNNER_TEMP/plan.md"
+          agent -p --force --trust --output-format text -- "$(<"$prompt")" >"$RUNNER_TEMP/plan.md"
 
       - name: Capture proposed patch
         if: steps.budget.outputs.run == 'true'
@@ -254,7 +254,7 @@ jobs:
           PROMPT
             printf '\nPR title: %s\n\nPR body:\n%s\n' "$PR_TITLE" "$PR_BODY"
           } >"$prompt"
-          agent -p --force --trust --output-format text <"$prompt" >"$RUNNER_TEMP/results.md"
+          agent -p --force --trust --output-format text -- "$(<"$prompt")" >"$RUNNER_TEMP/results.md"
 
       - name: Capture proposed patch
         run: |
