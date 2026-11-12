@@ -1,0 +1,111 @@
+---
+description: How we write Cypress component tests and UI tests with a mocked API in Fernly — Testing Library queries, no fixed waits, fixtures, one tag, honest failures.
+globs: web/cypress/**
+alwaysApply: false
+---
+
+# Cypress tests in Fernly
+
+## 1. Queries
+
+Prefer Testing Library order: `findByRole`, then `findByLabelText`, then `findByText`. Do not target CSS modules or raw tags.
+
+```typescript
+// ✅ GOOD — QuantityStepper.cy.tsx
+cy.findByRole('button', { name: 'Increase quantity' }).click();
+
+// ❌ BAD
+cy.get('button.QuantityStepper-module__button').last().click();
+```
+
+## 2. States
+
+Assert `disabled`, `checked`, or values on the element you already found. Chaining `.should('be.disabled')` on `findByRole` often fails with “Unable to find…”, which looks like a broken locator when the real issue is state.
+
+```typescript
+// ✅ GOOD
+cy.findByRole('button', { name: 'Decrease quantity' }).then(($el) =>
+  expect($el, '− at minimum quantity').to.be.disabled,
+);
+
+// ❌ BAD — QuantityStepper.cy.tsx (misleading failure at stock limit)
+cy.findByRole('button', { name: 'Increase quantity' }).should('be.disabled');
+```
+
+## 3. Waiting
+
+Never sleep for a fixed time. Wait on an intercept alias or on something the user can see.
+
+```typescript
+// ✅ GOOD — UI test with mocked API
+cy.intercept('GET', '/api/plants*', { fixture: 'plants/browse-page.json' }).as('plants');
+cy.visit('/');
+cy.wait('@plants');
+cy.findByRole('heading', { name: /plants/i });
+
+// ❌ BAD
+cy.visit('/');
+cy.wait(500);
+```
+
+## 4. Data
+
+Component tests pass props in the mount. UI tests load responses from `web/cypress/fixtures/` — one file per scenario (positive, negative, edge).
+
+```typescript
+// ✅ GOOD — component
+cy.mount(<QuantityStepper value={2} max={5} onChange={onChange} />);
+
+// ✅ GOOD — UI
+cy.intercept('GET', '/api/plants/pl-snake', { fixture: 'plants/snake-plant.json' }).as('plant');
+
+// ❌ BAD — inline huge JSON in the spec
+cy.intercept('GET', '/api/plants', { body: { items: [/* … */] } });
+```
+
+## 5. Mocks
+
+Stub only `/api/*` with `cy.intercept` and an alias. Never stub the page bundle or `window.fetch` globally.
+
+```typescript
+// ✅ GOOD
+cy.intercept('GET', '/api/cart', { fixture: 'cart/signed-in-empty.json' }).as('cart');
+
+// ❌ BAD
+cy.intercept('GET', '/', { fixture: 'pages/browse.html' });
+```
+
+## 6. Tags
+
+Exactly one level tag per test: `{ tags: '@component' }` or `{ tags: '@ui' }`. Add `@known-bug` only for a confirmed product bug; CI excludes it via `grepTags=-@known-bug`.
+
+```typescript
+// ✅ GOOD — QuantityStepper.cy.tsx
+it('disables − at the minimum', { tags: '@component' }, () => { /* … */ });
+
+// ❌ BAD
+it('disables − at the minimum', { tags: ['@component', '@ui'] }, () => { /* … */ });
+```
+
+## 7. App code
+
+Do not change `web/src` to green a test. If the test matches `docs/PRODUCT.md`, record it in `FINDINGS.md` (see F-01: + enabled at stock limit).
+
+```markdown
+<!-- ✅ GOOD — FINDINGS.md evidence -->
+- **Evidence:** web/cypress/component/QuantityStepper.cy.tsx, "disables + at the stock limit"
+
+<!-- ❌ BAD — “fixing” QuantityStepper.tsx value > max → value >= max without a product decision -->
+```
+
+## 8. Evidence
+
+Label what you actually did: **executed** (test run), **inspected** (browser or code read), or **not yet tested**.
+
+```markdown
+<!-- ✅ GOOD — FINDINGS.md -->
+- **Evidence:** … failing test … (executed: npm run cy:component)
+
+<!-- ❌ BAD -->
+- **Evidence:** probably wrong because we saw it once in the shop (inspected only, stated as proven)
+```
