@@ -17,6 +17,42 @@ One entry per proven issue, ordered by severity: money and privacy first, then b
 
 ## Findings
 
+### F-04: LEAFY10 takes 10% off subtotal plus shipping, not plants only
+
+- **Where:** `POST /api/cart/promo` percent codes
+- **Category:** Business rules in the API
+- **Impact:** Customers pay the wrong total — the discount is larger than the plant-only 10% the shop promises (e.g. Snake Plant $22 → discount `$2.90` instead of `$2.20`).
+- **Evidence:** `tests/api/promo.spec.ts`, "P01: LEAFY10 takes 10% off plant subtotal only, never shipping": expected discount `2.2`, received `2.9` (= 10% of `$22 + $6.95`). Same wrong amount fails P03 / P06 / P07 (executed: `npx playwright test tests/api/promo.spec.ts --project=api`).
+- **Contradicts:** docs/features/promo-codes.md: "A percentage code takes that percentage off the subtotal of the plants — never off shipping."; OpenAPI POST `/api/cart/promo` description.
+- **Suggested fix (optional):** Compute percent discount from plant `subtotal` only, then `total = subtotal − discount + shipping`.
+
+### F-05: Expired promo code SPRING5 is accepted
+
+- **Where:** `POST /api/cart/promo` with `SPRING5`
+- **Category:** Business rules in the API
+- **Impact:** A code that expired 30 Apr 2026 still discounts the cart (5% off), so customers get a deal that should have been refused.
+- **Evidence:** `tests/api/promo.spec.ts`, "P05: unknown, expired, empty cart, and empty code are refused": expected status `400` / `promo_invalid`, received `200` with `promoCode: SPRING5`. Also `tests/e2e/promo-checkout.spec.ts` P12: no expired message after applying `SPRING5` (executed).
+- **Contradicts:** docs/features/promo-codes.md: "Expired codes are refused, with a message that says the code has expired."; OpenAPI: expired codes refused with rule `promo_invalid`.
+- **Suggested fix (optional):** Reject codes whose `expiresAt` is before today with `400` / `promo_invalid` and an expired message.
+
+### F-06: Discount line shows −$4 / −$2.2 instead of two-decimal −$4.00 / −$2.20
+
+- **Where:** `OrderSummary` discount row via `formatPrice` (`web/src/money.ts`)
+- **Category:** Components
+- **Impact:** The savings line does not use the shop's two-decimal money format (same root cause as F-02).
+- **Evidence:** `web/cypress/component/OrderSummary.cy.tsx` P08: expected `−$4.00`, DOM shows `−$4`. `web/cypress/ui/cart-promo.cy.ts` P10 and `checkout-order-promo.cy.ts` P11: expected `−$2.20`, DOM shows `−$2.2` (executed: `npm run cy:component` / `npm run cy:ui`; screenshots under `web/cypress/screenshots/`).
+- **Contradicts:** PRODUCT.md: "Every price is shown in dollars with two decimals"; docs/features/promo-codes.md example `Discount (LEAFY10) −$4.00`.
+- **Suggested fix (optional):** Same as F-02 — format with two fraction digits.
+
+### F-07: Promo code field has no accessible name
+
+- **Where:** `PromoCodeInput` on the cart (`web/src/components/PromoCodeInput.tsx`)
+- **Category:** Accessibility
+- **Impact:** Screen-reader users get an unlabeled text field for the promo code, so they may not know what to type.
+- **Evidence:** `web/cypress/component/PromoCodeInput.cy.tsx` P09: `findByLabelText(/promo code/i)` fails. `tests/a11y/promo.spec.ts` P13: axe `label` (critical) on the cart promo `input` (executed).
+- **Contradicts:** docs/features/promo-codes.md: "The code field has a visible label."; PRODUCT.md: every form field has a name a screen reader can announce.
+- **Suggested fix (optional):** Associate a visible `<label>` (or `aria-label`) with the input, e.g. "Promo code".
+
 ### F-02: A plant priced 0 is shown as $0, not $0.00
 
 - **Where:** Browse plant cards, via `PriceTag` and `formatPrice` (`web/src/money.ts`)
@@ -47,6 +83,10 @@ One entry per proven issue, ordered by severity: money and privacy first, then b
 ## Suspicions — not yet tested
 
 These come from reading the code and from the first walk-through of the shop. "Seen" means it showed up in the browser during mapping, which is still not a test. Each one should become a finding with a test, or be dropped.
+
+### Promo codes
+
+- **Refused promo errors are not announced** (`PromoCodeInput` renders error in a plain `<p>` with no `role="alert"` / `aria-live`; P09 asserts `findByRole('alert')` but failed earlier on the missing label — not yet separately executed) — may contradict docs/features/promo-codes.md: "When a code is refused, the message is announced to screen-reader users as soon as it appears."
 
 ### Money
 

@@ -1,0 +1,28 @@
+{
+  "id": "ord-promo-1",
+  "status": "placed",
+  "createdAt": "2026-11-13T12:00:00.000Z",
+  "lines": [
+    {
+      "id": "ln-snake",
+      "plantId": "pl-snake",
+      "name": "Snake Plant",
+      "size": "S",
+      "unitPrice": 22,
+      "quantity": 1,
+      "lineTotal": 22,
+      "imageUrl": "/plants/snake.svg"
+    }
+  ],
+  "subtotal": 22,
+  "discount": 2.2,
+  "promoCode": "LEAFY10",
+  "shipping": 6.95,
+  "total": 26.75,
+  "shippingAddress": {
+    "fullName": "Ava Green",
+    "address": "1 Fern Lane",
+    "city": "Portland",
+    "postalCode": "97201"
+  }
+}
