@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { BrowsePage } from '../pages/BrowsePage';
 
 const THAI_MONSTERA_NAME =
   "Variegated Thai Constellation Monstera (Collector's Edition, Limited Greenhouse Batch)";
@@ -6,11 +7,11 @@ const THAI_MONSTERA_NAME =
 test('choosing "Price: high to low" shows the most expensive plant first', { tag: '@e2e' }, async ({
   page,
 }) => {
-  await page.goto('/');
-  await expect(page.getByRole('heading', { level: 2, name: /\d+ plants/ })).toBeVisible();
+  const browse = await new BrowsePage(page).goto();
+  await expect(browse.plantsCountHeading).toBeVisible();
 
-  await page.getByLabel('Sort by').selectOption('price-desc');
+  await browse.selectSort('price-desc');
 
-  const firstCard = page.getByRole('article').first();
-  await expect(firstCard.getByRole('heading', { level: 3 })).toHaveText(THAI_MONSTERA_NAME);
+  const firstCard = browse.firstPlantCard();
+  await expect(browse.plantCardTitle(firstCard)).toHaveText(THAI_MONSTERA_NAME);
 });

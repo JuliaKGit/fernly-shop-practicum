@@ -1,18 +1,27 @@
 import dotenv from 'dotenv';
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 dotenv.config();
 
 const apiURL = process.env.API_URL ?? 'http://localhost:8100';
 const webURL = process.env.WEB_URL ?? 'http://localhost:5173';
+const visualEnabled = Boolean(process.env.CI || process.env.VISUAL);
 
 export default defineConfig({
   fullyParallel: true,
+  expect: {
+    toHaveScreenshot: {
+      animations: 'disabled',
+      maxDiffPixels: 0,
+      threshold: 0,
+    },
+  },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
     ['list'],
+    ['json', { outputFile: 'reports/playwright.json' }],
     ['html', { open: 'never' }],
     [
       './tests/a11y/reporter.ts',
@@ -60,5 +69,19 @@ export default defineConfig({
       use: { baseURL: webURL },
       dependencies: ['setup'],
     },
+    ...(visualEnabled
+      ? [
+          {
+            name: 'visual',
+            testDir: './tests/visual',
+            use: {
+              ...devices['Desktop Chrome'],
+              baseURL: webURL,
+              viewport: { width: 1280, height: 800 },
+            },
+            dependencies: ['setup'],
+          },
+        ]
+      : []),
   ],
 });
