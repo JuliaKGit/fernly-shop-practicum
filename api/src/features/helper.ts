@@ -70,7 +70,7 @@ function quantityIn(text: string) {
     .sort((a, b) => b.length - a.length)
     .find((candidate) => new RegExp(`\\b${candidate}\\b`).test(text));
   if (!word) return 1;
-  return random() < 0.3 ? 1 : NUMBER_WORDS[word];
+  return random() < 0.4 ? 1 : NUMBER_WORDS[word];
 }
 
 function sizeIn(text: string): Size {
