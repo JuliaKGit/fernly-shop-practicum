@@ -1,0 +1,69 @@
+---
+description: Page objects for Fernly's Playwright end-to-end and visual tests — locators and actions live in tests/pages, specs only describe and assert.
+globs: tests/e2e/**, tests/visual/**, tests/pages/**
+alwaysApply: false
+---
+
+# Fernly page objects
+
+## 1. Where locators live
+
+Put every `getByRole`, `getByLabel`, and `getByText` on a class under `tests/pages/`. Specs orchestrate flows and assert; they do not define selectors.
+
+```typescript
+// ✅ GOOD — tests/e2e/browse.spec.ts
+const browse = await new BrowsePage(page).goto();
+await browse.selectSort('price-desc');
+await expect(browse.plantCardTitle(browse.firstPlantCard())).toHaveText(THAI_MONSTERA_NAME);
+
+// ❌ BAD — selector in the spec
+await page.getByLabel('Sort by').selectOption('price-desc');
+await expect(page.getByRole('article').first().getByRole('heading', { level: 3 })).toHaveText(name);
+```
+
+## 2. Locator order (role, label, text)
+
+Prefer accessible queries in that order. Do not use CSS classes, test ids, or XPath in page objects.
+
+```typescript
+// ✅ GOOD — tests/pages/BrowsePage.ts
+this.sortBy = page.getByLabel('Sort by');
+this.plantsCountHeading = page.getByRole('heading', { level: 2, name: /\d+ plants/ });
+
+// ❌ BAD
+this.sortBy = page.locator('.SortSelect-module__select');
+this.firstCard = page.locator('article').first();
+```
+
+## 3. Unnamed controls on a card
+
+When a control has no accessible name (the heart save toggle), find it by role inside its card and comment why.
+
+```typescript
+// ✅ GOOD — tests/pages/BrowsePage.ts
+/** Save (heart) toggle — icon-only button with no accessible name; scoped by card + button role. */
+saveButtonInCard(card: Locator): Locator {
+  return card.getByRole('button');
+}
+
+// ❌ BAD
+saveButton = page.locator('button.PlantCard-module__save');
+```
+
+## 4. Actions and assertions
+
+Page object methods perform navigation and interaction only. They return `void`, `this`, or the next page object — never call `expect`. Keep every assertion in the spec.
+
+```typescript
+// ✅ GOOD — tests/pages/BrowsePage.ts
+async selectSort(value: string): Promise<BrowsePage> {
+  await this.sortBy.selectOption(value);
+  return this;
+}
+
+// ❌ BAD — assertion in a page object
+async selectSort(value: string): Promise<void> {
+  await this.sortBy.selectOption(value);
+  await expect(this.firstPlantCard()).toContainText('Monstera');
+}
+```
