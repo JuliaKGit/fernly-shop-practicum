@@ -23,6 +23,7 @@ jobs:
   plan:
     if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout PR branch (full history)
         uses: actions/checkout@v5
@@ -56,6 +57,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run change-triage (write plan)
+        timeout-minutes: 12
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -65,9 +67,16 @@ jobs:
           set +x
           PLAN_FILE="docs/test-plans/${HEAD_REF}.md"
           mkdir -p "$(dirname "${PLAN_FILE}")"
-          agent -p --force --trust --output-format text \
-            "Use the change-triage subagent on this pull request. The diff is git diff ${{ env.BASE_REMOTE }}/${BASE_REF}...HEAD. Write the plan to ${PLAN_FILE} and print only the plan." \
-            | tee plan.md
+          printf '%s\n' "Use the change-triage subagent on this pull request. The diff is git diff ${{ env.BASE_REMOTE }}/${BASE_REF}...HEAD. Write the plan to ${PLAN_FILE} and print only the plan." > agent-prompt.txt
+          bash scripts/run-agent.sh agent-prompt.txt plan.md plan-trail.jsonl
+
+      - name: Upload plan agent trail
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: plan-agent-trail
+          path: plan-trail.jsonl
+          if-no-files-found: ignore
 
       - name: Commit plan and push to PR branch
         env:
@@ -97,6 +106,7 @@ jobs:
   tests:
     if: github.event.action == 'labeled' && github.event.label.name == 'plan-approved'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       FERNLY_USER_EMAIL: ava@fernly.test
       FERNLY_USER_PASSWORD: Fernly-Ava-2026
@@ -105,7 +115,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -119,7 +129,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B "${HEAD_REF}" "${{ github.event.pull_request.head.sha }}"
+          git checkout -B "${HEAD_REF}"
           if ! git remote get-url "${{ env.BASE_REMOTE }}" >/dev/null 2>&1; then
             git remote add "${{ env.BASE_REMOTE }}" "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
           fi
@@ -145,14 +155,22 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run change-triage (approved plan)
+        timeout-minutes: 40
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
           set -euo pipefail
           set +x
-          agent -p --force --trust --output-format text \
-            'The plan is approved. Route each row to its specialist, write the tests, run them, and write the results file. Never change app code.' \
-            | tee results.md
+          printf '%s\n' "The plan is approved. Do not hand work to a subagent. Write one test per plan row, run each new spec file once, and write the results file. Fix a failing test at most twice, then record that failure as a possible finding. Never change app code. Never start npm start, npm run start:web, or cypress open in the foreground." > agent-prompt.txt
+          bash scripts/run-agent.sh agent-prompt.txt results.md results-trail.jsonl
+
+      - name: Upload tests agent trail
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tests-agent-trail
+          path: results-trail.jsonl
+          if-no-files-found: ignore
 
       - name: Commit tests, docs, findings and push
         env:
@@ -165,6 +183,8 @@ jobs:
             echo "No test or doc changes to commit."
           else
             git commit -m "test: implement approved PR triage plan"
+            git pull --rebase "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.event.pull_request.head.repo.full_name }}.git" \
+              "${HEAD_REF}"
             git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.event.pull_request.head.repo.full_name }}.git" \
               "HEAD:refs/heads/${HEAD_REF}"
           fi
