@@ -1,0 +1,19 @@
+{
+  "id": "pl-snake",
+  "name": "Snake Plant",
+  "latinName": "Dracaena trifasciata",
+  "price": 22,
+  "light": "low",
+  "careLevel": 1,
+  "petSafe": false,
+  "stock": 20,
+  "rating": 4.8,
+  "imageUrl": "/plants/snake.svg",
+  "description": "Upright, sword-shaped leaves. Happy in dim rooms and with irregular watering.",
+  "sizes": [
+    { "label": "S", "priceDelta": 0 },
+    { "label": "M", "priceDelta": 8 },
+    { "label": "L", "priceDelta": 16 }
+  ],
+  "similar": ["pl-zz", "pl-pothos"]
+}

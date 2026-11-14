@@ -14,6 +14,8 @@ const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const;
 export interface ScanPageOptions {
   /** Logical page name; must match `page` in a11y-baseline.json rows. */
   name: string;
+  /** Optional axe include selector(s) to limit the scan (e.g. a Reviews section). */
+  include?: string | string[];
 }
 
 export interface ScanPageResult {
@@ -45,9 +47,14 @@ export async function scanPage(
   const baseline: BaselineEntry[] = await loadBaseline();
   const scannedAt = new Date().toISOString();
 
-  const rawResults: AxeResults = await new AxeBuilder({ page })
-    .withTags([...AXE_TAGS])
-    .analyze();
+  let builder = new AxeBuilder({ page }).withTags([...AXE_TAGS]);
+  if (options.include) {
+    const includes = Array.isArray(options.include) ? options.include : [options.include];
+    for (const selector of includes) {
+      builder = builder.include(selector);
+    }
+  }
+  const rawResults: AxeResults = await builder.analyze();
 
   const violations: Result[] = rawResults.violations;
   const passes: Result[] = rawResults.passes;

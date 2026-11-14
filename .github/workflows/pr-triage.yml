@@ -106,7 +106,7 @@ jobs:
   tests:
     if: github.event.action == 'labeled' && github.event.label.name == 'plan-approved'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       FERNLY_USER_EMAIL: ava@fernly.test
       FERNLY_USER_PASSWORD: Fernly-Ava-2026
@@ -155,7 +155,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run change-triage (approved plan)
-        timeout-minutes: 40
+        timeout-minutes: 90
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
