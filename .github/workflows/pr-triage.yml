@@ -1,0 +1,197 @@
+# Runs the change-triage flow: plan on every PR update, full test implementation when labeled plan-approved.
+# CURSOR_API_KEY must be set as a repository secret. Never log or echo the API key.
+
+name: PR triage
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+
+concurrency:
+  group: pr-triage-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  # Remote for the PR base repository (merge + diff). Keeps fork checkouts' `origin` intact.
+  BASE_REMOTE: base
+
+jobs:
+  plan:
+    if: github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR branch (full history)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge base branch and configure git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${HEAD_REF}" "${{ github.event.pull_request.head.sha }}"
+          if ! git remote get-url "${{ env.BASE_REMOTE }}" >/dev/null 2>&1; then
+            git remote add "${{ env.BASE_REMOTE }}" "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          fi
+          git fetch "${{ env.BASE_REMOTE }}" "${BASE_REF}"
+          git merge --no-edit "${{ env.BASE_REMOTE }}/${BASE_REF}"
+
+      - name: Install Cursor CLI
+        run: |
+          set -euo pipefail
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run change-triage (write plan)
+        timeout-minutes: 12
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          set +x
+          PLAN_FILE="docs/test-plans/${HEAD_REF}.md"
+          mkdir -p "$(dirname "${PLAN_FILE}")"
+          printf '%s\n' "Use the change-triage subagent on this pull request. The diff is git diff ${{ env.BASE_REMOTE }}/${BASE_REF}...HEAD. Write the plan to ${PLAN_FILE} and print only the plan." > agent-prompt.txt
+          bash scripts/run-agent.sh agent-prompt.txt plan.md plan-trail.jsonl
+
+      - name: Upload plan agent trail
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: plan-agent-trail
+          path: plan-trail.jsonl
+          if-no-files-found: ignore
+
+      - name: Commit plan and push to PR branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          PLAN_FILE="docs/test-plans/${HEAD_REF}.md"
+          if [ -f "$PLAN_FILE" ]; then
+            git add -- "$PLAN_FILE"
+          fi
+          if git diff --staged --quiet; then
+            echo "No plan file to commit (agent may not have written the plan)."
+          else
+            git commit -m "docs: add PR test plan from change-triage"
+            git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.event.pull_request.head.repo.full_name }}.git" \
+              "HEAD:refs/heads/${HEAD_REF}"
+          fi
+
+      - name: Comment plan on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file plan.md
+
+  tests:
+    if: github.event.action == 'labeled' && github.event.label.name == 'plan-approved'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FERNLY_USER_EMAIL: ava@fernly.test
+      FERNLY_USER_PASSWORD: Fernly-Ava-2026
+    steps:
+      - name: Checkout PR branch (full history)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge base branch and configure git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${HEAD_REF}"
+          if ! git remote get-url "${{ env.BASE_REMOTE }}" >/dev/null 2>&1; then
+            git remote add "${{ env.BASE_REMOTE }}" "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          fi
+          git fetch "${{ env.BASE_REMOTE }}" "${BASE_REF}"
+          git merge --no-edit "${{ env.BASE_REMOTE }}/${BASE_REF}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Cursor CLI
+        run: |
+          set -euo pipefail
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run change-triage (approved plan)
+        timeout-minutes: 40
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          printf '%s\n' "The plan is approved. Do not hand work to a subagent. Write one test per plan row, run each new spec file once, and write the results file. Fix a failing test at most twice, then record that failure as a possible finding. Never change app code. Never start npm start, npm run start:web, or cypress open in the foreground." > agent-prompt.txt
+          bash scripts/run-agent.sh agent-prompt.txt results.md results-trail.jsonl
+
+      - name: Upload tests agent trail
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tests-agent-trail
+          path: results-trail.jsonl
+          if-no-files-found: ignore
+
+      - name: Commit tests, docs, findings and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git add tests web/cypress docs/test-plans FINDINGS.md package.json package-lock.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No test or doc changes to commit."
+          else
+            git commit -m "test: implement approved PR triage plan"
+            git pull --rebase "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.event.pull_request.head.repo.full_name }}.git" \
+              "${HEAD_REF}"
+            git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.event.pull_request.head.repo.full_name }}.git" \
+              "HEAD:refs/heads/${HEAD_REF}"
+          fi
+
+      - name: Comment results on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file results.md
