@@ -57,10 +57,13 @@ These come from reading the code and from the first walk-through of the shop. "S
 
 - **Any signed-in customer may read any order by id** (`store.ts` `getOrder(_userId, id)` never compares the order's owner; needs Ben's token against Ava's order id) — may contradict PRODUCT.md: "An order is private: only the customer who placed it can see it. Anyone else gets 'Order not found'." and OpenAPI `GET /orders/{orderId}`: "anyone else gets 404".
 - **Sign out keeps a viewed order in the cache** (`AuthContext` `signOut` removes `['cart']` and `['orders']` but not `['order', id]`, so the next customer on the same tab may briefly see the previous customer's order) — may contradict PRODUCT.md: "Signing out forgets the session on this device."
+- **Any signed-in customer can delete any review** (`DELETE /api/reviews/{reviewId}` does not check authorship; executed: `tests/api/R1-delete-review.spec.ts` — Ava deletes Ben's review → 204 instead of 404) — may contradict docs/features/plant-reviews.md: "Only the author can delete a review. Anyone else gets 'Review not found'." and OpenAPI delete: "Only the author can delete a review; anyone else gets 404."
 
 ### Broken flows
 
 - **The plant page shows the previous plant after a "Likes the same light" link** (`web/src/api/queries.ts` `usePlant` caches under `['plant']` with no id; seen: from Snake Plant, clicking ZZ Plant gives the URL `/plants/pl-zz` but still shows Snake Plant, $22, 20 in stock; Add to cart there would add Snake Plant) — may contradict PRODUCT.md: "The plant page always shows the plant in the address bar, including after following a 'Likes the same light' link."
+- **A new review does not appear in the list after posting** (Reviews slot invalidates `['review', plant.id]` but the query key is `['reviews', plant.id]`; toast still shows; executed: `web/cypress/ui/plant-reviews.cy.ts` R7 and `tests/e2e/plant-reviews.spec.ts` R8) — may contradict docs/features/plant-reviews.md: "After posting, the review appears in the list right away."
+- **Review average floors instead of rounding halves up** (seed Snake Plant ratings 5, 4, 5 → API average **4.6**; executed: `tests/api/R3-get-reviews.spec.ts`) — may contradict docs/features/plant-reviews.md: "The average is rounded to one decimal, halves up… show as **4.7**."
 
 ### Components and the contract
 
@@ -69,6 +72,7 @@ These come from reading the code and from the first walk-through of the shop. "S
 
 ### Accessibility
 
+- **Star rating radios lack `aria-checked` (and keyboard radio behavior)** (`StarRatingInput` uses `role="radio"` without `aria-checked` or arrow-key handling; executed: `web/cypress/component/StarRatingInput.cy.tsx` R4; axe `aria-required-attr` on signed-in Reviews in `tests/a11y/plant-reviews.spec.ts` R9) — may contradict docs/features/plant-reviews.md: "The star rating works with the keyboard like any group of radio buttons… a screen reader announces which star is selected."
 - **The search field has no accessible name** (`SearchBox` input has no label or `aria-label`; the "Search plants" text is a decorative `<span>`; seen: the accessibility tree lists an unnamed `searchbox`) — may contradict PRODUCT.md: "every button and form field has a name a screen reader can announce".
 - **The heart (save) buttons have no accessible name** (`PlantCard` button holds only an `aria-hidden` SVG; seen: all 12 heart buttons on page 1 are unnamed) — may contradict PRODUCT.md: "every button and form field has a name a screen reader can announce".
 - **The plant page's main image has no alt text** (`PlantPage` `<img src={data.imageUrl} …>` has no `alt`; seen: `alt` is missing) — may contradict PRODUCT.md: "every meaningful image has alternative text".
@@ -80,6 +84,8 @@ These come from reading the code and from the first walk-through of the shop. "S
 
 Not defects. These are open questions to settle before testing.
 
+- The Reviews slot has no delete control even though OpenAPI and the feature doc describe author-only delete. Is delete API-only for this PR?
+- The Reviews slot shows "Loading reviews…" while fetching — not specified in docs/features/plant-reviews.md. Is that the expected copy?
 - The API caps a cart quantity at 20 (`quantity must be 20 or less`), but PRODUCT.md only mentions the stock limit. Should a customer be able to add 25 of Pothos (stock 30)?
 - The checkout error shows the raw API text ("shippingAddress.fullName: fullName must not be empty; …") in one banner, and no field is marked invalid. Is that acceptable?
 - `postalCode` needs at least 3 characters in the contract. PRODUCT.md only says a postal code is required.
