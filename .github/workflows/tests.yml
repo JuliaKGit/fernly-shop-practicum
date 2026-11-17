@@ -155,3 +155,14 @@ jobs:
           name: qa-report
           path: qa-report
           retention-days: 90
+
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Pipeline gates
+        run: bash scripts/test-gates.sh

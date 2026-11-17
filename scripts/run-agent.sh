@@ -9,12 +9,33 @@ prompt_file="${1:?usage: run-agent.sh <prompt-file> <result-file> <trail-file>}"
 result_file="${2:?usage: run-agent.sh <prompt-file> <result-file> <trail-file>}"
 trail_file="${3:?usage: run-agent.sh <prompt-file> <result-file> <trail-file>}"
 
-agent -p --force --trust --output-format stream-json -- "$(<"$prompt_file")" \
-  | tee "$trail_file" \
+# Line-buffer so a command that never returns is the last line in the log, not stuck in a pipe buffer.
+stream_log() {
+  if command -v stdbuf >/dev/null 2>&1; then
+    stdbuf -oL tee "$trail_file"
+  else
+    tee "$trail_file"
+  fi
+}
+
+run_agent() {
+  if command -v stdbuf >/dev/null 2>&1; then
+    stdbuf -oL agent -p --force --trust --output-format stream-json -- "$(<"$prompt_file")"
+  else
+    agent -p --force --trust --output-format stream-json -- "$(<"$prompt_file")"
+  fi
+}
+
+run_agent \
+  | stream_log \
   | jq -Rrc --unbuffered 'fromjson? |
       if .type == "tool_call" and .subtype == "started" then "→ " + (.tool_call | tostring | .[0:300])
       elif .type == "assistant" then "· " + ((.message.content // []) | map(.text // "") | join("") | gsub("\n"; " ") | .[0:200])
       else empty end'
 
-jq -Rrs '[split("\n")[] | fromjson? | select(.type == "assistant")]
-  | (last.message.content // []) | map(.text // "") | join("")' "$trail_file" > "$result_file"
+jq -Rrs '
+  ([split("\n")[] | fromjson? | select(.type == "assistant")]) as $msgs
+  | if ($msgs | length) == 0 then ""
+    else ($msgs | last | .message.content // [] | map(.text // "") | join(""))
+    end
+' "$trail_file" > "$result_file"

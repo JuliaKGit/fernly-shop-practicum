@@ -5,6 +5,10 @@
       {
         "command": "node .cursor/hooks/guard-baselines.mjs",
         "failClosed": true
+      },
+      {
+        "command": "node .cursor/hooks/guard-approvals.mjs",
+        "failClosed": true
       }
     ],
     "afterFileEdit": [
