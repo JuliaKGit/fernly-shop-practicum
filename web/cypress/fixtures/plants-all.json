@@ -1,0 +1,43 @@
+{
+  "items": [
+    {
+      "id": "pl-snake",
+      "name": "Snake Plant",
+      "latinName": "Dracaena trifasciata",
+      "price": 22,
+      "light": "low",
+      "careLevel": 1,
+      "petSafe": false,
+      "stock": 20,
+      "rating": 4.8,
+      "imageUrl": "/plants/snake.svg"
+    },
+    {
+      "id": "pl-zz",
+      "name": "ZZ Plant",
+      "latinName": "Zamioculcas zamiifolia",
+      "price": 27.5,
+      "light": "low",
+      "careLevel": 1,
+      "petSafe": false,
+      "stock": 9,
+      "rating": 4.6,
+      "imageUrl": "/plants/snake.svg"
+    },
+    {
+      "id": "pl-pothos",
+      "name": "Pothos 'Golden'",
+      "latinName": "Epipremnum aureum",
+      "price": 12.5,
+      "light": "low",
+      "careLevel": 1,
+      "petSafe": false,
+      "stock": 30,
+      "rating": 4.5,
+      "imageUrl": "/plants/trailing.svg"
+    }
+  ],
+  "total": 3,
+  "page": 1,
+  "pageSize": 48
+}

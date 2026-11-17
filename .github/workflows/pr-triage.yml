@@ -259,7 +259,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       FERNLY_USER_EMAIL: ava@fernly.test
       FERNLY_USER_PASSWORD: Fernly-Ava-2026
@@ -329,7 +329,7 @@ jobs:
           } > "$RUNNER_TEMP/agent-prompt.txt"
 
       - name: Run change-triage (approved plan)
-        timeout-minutes: 40
+        timeout-minutes: 90
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |

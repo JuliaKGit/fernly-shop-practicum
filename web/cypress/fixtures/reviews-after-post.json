@@ -1,0 +1,35 @@
+{
+  "plantId": "pl-snake",
+  "average": 4.8,
+  "count": 4,
+  "reviews": [
+    {
+      "id": "rv-new-1",
+      "author": "Ava Green",
+      "rating": 5,
+      "text": "Posted from the plant page review form.",
+      "createdAt": "2026-11-14T12:00:00.000Z"
+    },
+    {
+      "id": "rv-seed-3",
+      "author": "Ben Moss",
+      "rating": 5,
+      "text": "My third one. Impossible to kill.",
+      "createdAt": "2026-10-05T08:10:00.000Z"
+    },
+    {
+      "id": "rv-seed-2",
+      "author": "Omar K.",
+      "rating": 4,
+      "text": "Arrived healthy, a little smaller than expected.",
+      "createdAt": "2026-09-18T15:30:00.000Z"
+    },
+    {
+      "id": "rv-seed-1",
+      "author": "Grace L.",
+      "rating": 5,
+      "text": "Survived my dark hallway and a month of neglect.",
+      "createdAt": "2026-09-02T10:00:00.000Z"
+    }
+  ]
+}
