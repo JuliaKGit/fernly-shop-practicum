@@ -1,0 +1,123 @@
+---
+description: How we test the Fernly API — PRODUCT.md and OpenAPI are the oracle, black-box only, reset once per run, schema checks, one tag, evidence labels.
+globs: tests/**
+alwaysApply: false
+---
+
+# Fernly API testing
+
+## 1. Oracle
+
+`docs/PRODUCT.md` and `/openapi.json` define correct behavior. If the running API differs, keep the documented expectation and let the test fail — report the defect; never weaken or rewrite the assertion to match the API. Behavior neither document covers belongs in `FINDINGS.md` under "Questions" as assumed until a human answers; do not assert it yet.
+
+```typescript
+// ✅ GOOD — OpenAPI says price-desc (highest first)
+const res = await request.get('/api/plants?sort=price-desc');
+const body = await res.json();
+expect(body.items[0].price).toBe(Math.max(...body.items.map((p) => p.price)));
+
+// ❌ BAD — API sorted ascending, so the test “passes” with wrong expectations
+expect(body.items[0].name).toBe('Succulent Cutting');
+```
+
+## 2. Black box
+
+Tests call HTTP only. Never import, read, or change anything under `api/src/` or `web/src/`.
+
+```typescript
+// ✅ GOOD
+const res = await request.get('/api/plants');
+
+// ❌ BAD
+import { store } from '../../api/src/store';
+```
+
+## 3. Requests
+
+Use Playwright’s `request` fixture with path-only URLs; host and port come from `baseURL` in `playwright.config.ts` (`API_URL` for API projects).
+
+```typescript
+// ✅ GOOD
+await request.get('/api/health');
+
+// ❌ BAD
+await request.get('http://localhost:8100/api/plants');
+```
+
+## 4. Data
+
+Each test uses seed catalog data or creates its own records (unique emails for register, and so on). Never call `POST /api/admin/reset` inside a test — only `tests/reset.setup.ts` does that once per run. Do not rely on another test’s records except steps in one serial `@e2e` flow.
+
+```typescript
+// ✅ GOOD — setup project resets before api and e2e
+// tests/reset.setup.ts → POST /api/admin/reset
+
+// ❌ BAD — reset in every spec file
+test.beforeEach(async ({ request }) => {
+  await request.post('/api/admin/reset');
+});
+```
+
+## 5. Per endpoint
+
+Cover each endpoint with three cases where practical: **positive** (happy path), **negative** (one invalid input or one rule violation at a time → 400 with `rule`), **error** (unknown id → 404).
+
+```typescript
+// ✅ GOOD — GET /plants/{id}: 200 + schema, unknown id → 404
+
+// ❌ BAD — only GET /api/plants 200, no 404 or validation cases
+```
+
+## 6. Assertions
+
+Assert status; on every 400 assert the exact `rule` when the contract defines one. Assert values that matter (sort order, totals, ownership), not merely that a key exists. Validate response shape with `expectSchema` against OpenAPI component schemas (`tests/helpers/schema.ts` loads `/openapi.json` from the API host).
+
+```typescript
+// ✅ GOOD
+expect(body.rule).toBe('cart_line_quantity_limit');
+await expectSchema(request, body, 'Plant');
+
+// ❌ BAD
+expect(body).toHaveProperty('id');
+expect(res.status()).toBe(400); // no rule check
+```
+
+## 7. Tags
+
+Exactly one tag per test: `{ tag: '@api' }` for a single endpoint or contract check, `{ tag: '@e2e' }` for a browser flow. Put the tag on `test()`, never on `describe()`.
+
+```typescript
+// ✅ GOOD
+test('GET /plants/{id} matches Plant schema', { tag: '@api' }, async ({ request }) => { ... });
+
+// ❌ BAD
+test.describe('plants', { tag: '@api' }, () => { ... });
+```
+
+## 8. Known bugs
+
+A test for a confirmed bug keeps full assertions and uses `test.fail(true, 'F-NN: <one line>')`. Never delete the test or loosen expectations.
+
+```typescript
+// ✅ GOOD
+test('price-desc lists highest price first', { tag: '@api' }, async ({ request }) => {
+  test.fail(true, 'F-04: price-desc uses ascending comparator');
+  // ... full documented expectations ...
+});
+
+// ❌ BAD — bug “fixed” in the test by expecting cheapest first
+expect(body.items[0].price).toBe(0.99);
+```
+
+## 9. Evidence
+
+Label every behavioral claim in comments, reports, or `FINDINGS.md`: **executed** (this run proved it), **inspected only** (read from docs/OpenAPI, not exercised), or **not yet tested**.
+
+```markdown
+<!-- ✅ GOOD -->
+- price-desc highest first — executed (tests/api/plants.spec.ts)
+- POST /orders negative cases — not yet tested
+
+<!-- ❌ BAD -->
+- All plant endpoints are covered (no label, no proof)
+```

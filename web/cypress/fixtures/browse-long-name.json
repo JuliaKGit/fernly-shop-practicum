@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "id": "pl-long-name",
+      "name": "Variegated Thai Constellation Monstera Collectors Edition Limited Greenhouse Batch Supercalifragilisticexpialidocious",
+      "latinName": "Monstera deliciosa",
+      "price": 189,
+      "light": "medium",
+      "careLevel": 3,
+      "petSafe": false,
+      "stock": 2,
+      "rating": 4.9,
+      "imageUrl": "/plants/monstera.svg"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pageSize": 12
+}

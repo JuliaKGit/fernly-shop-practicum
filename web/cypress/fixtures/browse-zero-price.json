@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "id": "pl-gift",
+      "name": "Gift Fern",
+      "latinName": "Nephrolepis exaltata",
+      "price": 0,
+      "light": "medium",
+      "careLevel": 1,
+      "petSafe": true,
+      "stock": 4,
+      "rating": 4,
+      "imageUrl": "/plants/fern.svg"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pageSize": 12
+}
